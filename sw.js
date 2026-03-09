@@ -1,4 +1,4 @@
-const CACHE_NAME = 'oxygen-v1.1.4'; // غيّر الرقم مع كل إصدار جديد
+const CACHE_NAME = 'oxygen-v3'; // غيّر الرقم مع كل إصدار جديد
 const STATIC_ASSETS = [
     '/',
     '/index.html',
