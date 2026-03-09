@@ -457,7 +457,7 @@ async function fetchQuizzesList() {
     data.forEach(quiz => {
         const dateObj = new Date(quiz.created_at);
         const dateStr = dateObj.toLocaleDateString('ar-IQ', { month: 'short', day: 'numeric' });
-        
+
         const card = document.createElement('div');
         card.className = 'glass-card mb-3 slide-up';
         card.innerHTML = `
@@ -477,10 +477,10 @@ async function fetchQuizzesList() {
 function checkStaticAnswer(el, correctId, selectedId, explanation) {
     if (el.parentElement.classList.contains('locked')) return;
     el.parentElement.classList.add('locked');
-    
+
     const feedback = el.parentElement.nextElementSibling;
     feedback.style.display = 'block';
-    
+
     if (selectedId === correctId) {
         el.classList.add('correct');
         feedback.innerHTML = `<strong class="text-success"><i class="fa-solid fa-check"></i> إجابة صحيحة!</strong><div class="mt-1">${explanation || ''}</div>`;
@@ -515,34 +515,49 @@ function answerQuiz(selectedId, el, optionsList) {
     feedback.classList.add('slide-up');
 }
 
+// ===== 1. fetchLatestAd =====
 async function fetchLatestAd() {
-    const { data } = await sb.from('ads').select('*').order('created_at', { ascending: false }).limit(1).single();
+    // نجلب المثبت أولاً، إن لم يوجد نجلب الأحدث
+    let { data } = await sb.from('ads').select('*')
+        .eq('is_pinned', true)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+    if (!data) {
+        const res = await sb.from('ads').select('*')
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+        data = res.data;
+    }
+
     const container = document.getElementById('latest-announcement');
     if (!container) return;
 
     if (data) {
-        const dateObj = new Date(data.created_at);
-        const dateStr = dateObj.toLocaleDateString('ar-IQ', { month: 'short', day: 'numeric' });
+        const dateStr = new Date(data.created_at).toLocaleDateString('ar-IQ', { month: 'short', day: 'numeric' });
         container.innerHTML = `
-            <div class="ad-card glass-card" style="padding: 1rem; border-radius: 12px;">
-                <div style="flex:1;">
-                    <p style="font-size:0.9rem; font-weight:700;">${data.content}</p>
-                    <small class="text-muted" style="display:block; margin-top:0.4rem; font-size: 0.7rem;"><i class="fa-regular fa-clock"></i> ${dateStr}</small>
+            <div class="ad-card-mini glass-card">
+                <div class="ad-card-mini-top">
+                    ${data.is_pinned ? '<span class="pin-badge"><i class="fa-solid fa-thumbtack"></i> مثبت</span>' : ''}
+                    <span class="ad-date-mini"><i class="fa-regular fa-clock"></i> ${dateStr}</span>
                 </div>
+                <p class="ad-text-mini">${data.content}</p>
             </div>
         `;
     } else {
-        container.innerHTML = `<p class="text-muted text-center" style="font-size: 0.8rem;">لا توجد تبليغات حالياً</p>`;
+        container.innerHTML = `<p class="text-muted text-center" style="font-size:0.75rem;">لا توجد تبليغات حالياً</p>`;
     }
 }
 
-// 2. Full Ads List
+// ===== 2. fetchAds =====
 async function fetchAds() {
     const list = document.getElementById('announcements-list-full');
     if (!list) return;
-    
-    const { data } = await sb.from('ads').select('*').order('created_at', { ascending: false });
-    
+
+    const { data } = await sb.from('ads').select('*').order('is_pinned', { ascending: false }).order('created_at', { ascending: false });
+
     if (!data || data.length === 0) {
         list.innerHTML = `<p class="text-muted text-center" style="padding:2rem">لا توجد تبليغات حالياً.</p>`;
         return;
@@ -550,25 +565,20 @@ async function fetchAds() {
 
     list.innerHTML = '';
     data.forEach(ad => {
-        const dateObj = new Date(ad.created_at);
-        const dateStr = dateObj.toLocaleDateString('ar-IQ', { 
-            weekday: 'long', 
-            year: 'numeric', 
-            month: 'long', 
-            day: 'numeric',
-            hour: '2-digit',
-            minute: '2-digit'
+        const dateStr = new Date(ad.created_at).toLocaleDateString('ar-IQ', {
+            weekday: 'short', month: 'short', day: 'numeric'
         });
-        
+
         list.innerHTML += `
-            <div class="ad-card glass-card slide-up mb-2">
-                <div class="ad-icon"><i class="fa-solid fa-bullhorn"></i></div>
-                <div style="flex:1;">
-                    <p style="font-size:1rem; font-weight:700; line-height:1.6; color: #fff;">${ad.content}</p>
-                    <div style="display:flex; align-items:center; gap:0.5rem; margin-top:0.8rem; color: var(--primary); font-size:0.75rem; font-weight:600;">
-                        <i class="fa-regular fa-calendar"></i> ${dateStr}
+            <div class="ad-card-full glass-card slide-up ${ad.is_pinned ? 'pinned-ad' : ''}">
+                <div class="ad-card-full-header">
+                    <div style="display:flex; align-items:center; gap:0.5rem;">
+                        <i class="fa-solid fa-bullhorn" style="color:var(--warning); font-size:0.85rem;"></i>
+                        ${ad.is_pinned ? '<span class="pin-badge"><i class="fa-solid fa-thumbtack"></i> مثبت</span>' : ''}
                     </div>
+                    <span class="ad-date-mini"><i class="fa-regular fa-calendar"></i> ${dateStr}</span>
                 </div>
+                <p class="ad-text-body">${ad.content}</p>
             </div>
         `;
     });
@@ -672,7 +682,7 @@ function renderSkills() {
         card.style.justifyContent = 'space-between';
         card.style.cursor = 'pointer';
         card.onclick = () => toggleSkill(skill.id);
-        
+
         card.innerHTML = `
             <div class="skill-info">
                 <h4 style="font-size: 0.95rem; margin-bottom: 0.2rem;">${skill.title}</h4>
@@ -905,19 +915,104 @@ function switchAdminTab(tab) {
 async function fetchAdminAds() {
     const list = document.getElementById('admin-ads-list');
     if (!list) return;
-    const { data } = await sb.from('ads').select('*').order('created_at', { ascending: false });
+    const { data } = await sb.from('ads').select('*').order('is_pinned', { ascending: false }).order('created_at', { ascending: false });
     list.innerHTML = '';
     data?.forEach(ad => {
+        // اقتطاع النص المعروض في الإدارة (بدون HTML tags)
+        const plainText = ad.content.replace(/<[^>]*>/g, '').substring(0, 60);
         list.innerHTML += `
             <div class="admin-item-row">
                 <div class="admin-item-info">
-                   <h4>${ad.content}</h4>
-                   <span>إعلان عام</span>
+                    <h4>${plainText}${ad.content.length > 60 ? '...' : ''}</h4>
+                    <span>${ad.is_pinned ? '📌 مثبت' : 'تبليغ عادي'}</span>
                 </div>
-                <button class="action-btn text-danger" onclick="deleteItem('ads', '${ad.id}', fetchAdminAds)"><i class="fa-solid fa-trash"></i></button>
+                <div style="display:flex; gap:0.4rem;">
+                    <button class="action-btn" onclick="togglePin('${ad.id}', ${ad.is_pinned})" 
+                        title="${ad.is_pinned ? 'إلغاء التثبيت' : 'تثبيت'}"
+                        style="color: ${ad.is_pinned ? 'var(--warning)' : 'var(--text-muted)'}">
+                        <i class="fa-solid fa-thumbtack"></i>
+                    </button>
+                    <button class="action-btn text-danger" onclick="deleteItem('ads', '${ad.id}', fetchAdminAds)">
+                        <i class="fa-solid fa-trash"></i>
+                    </button>
+                </div>
             </div>
         `;
     });
+}
+
+// ===== 5. الدوال الجديدة =====
+
+// تثبيت / إلغاء تثبيت تبليغ
+async function togglePin(id, currentState) {
+    // إذا كنا نثبت هذا، نفك تثبيت الباقين أولاً
+    if (!currentState) {
+        await sb.from('ads').update({ is_pinned: false }).neq('id', id);
+    }
+    const { error } = await sb.from('ads').update({ is_pinned: !currentState }).eq('id', id);
+    if (!error) {
+        showToast(!currentState ? '📌 تم تثبيت التبليغ في الواجهة الرئيسية' : 'تم إلغاء التثبيت', 'success');
+        fetchAdminAds();
+        fetchLatestAd();
+    }
+}
+
+// أدوات Rich Text Editor
+function formatText(command) {
+    document.getElementById('admin-ad-content').focus();
+    document.execCommand(command, false, null);
+}
+
+function formatColor(color) {
+    const editor = document.getElementById('admin-ad-content');
+    editor.focus();
+
+    const selection = window.getSelection();
+    if (!selection || selection.rangeCount === 0 || selection.isCollapsed) {
+        showToast('حدد النص أولاً ثم اختر اللون', 'info');
+        return;
+    }
+
+    const range = selection.getRangeAt(0);
+
+    // استخراج محتوى التحديد كاملاً مع تنسيقاته الداخلية
+    const fragment = range.extractContents();
+
+    // إنشاء span يحمل اللون فقط بدون المساس بما بداخله
+    const span = document.createElement('span');
+    span.style.color = color;
+    span.appendChild(fragment);
+
+    // إدراجه مكان التحديد الأصلي
+    range.insertNode(span);
+
+    // إعادة تحديد النص بعد الإدراج
+    selection.removeAllRanges();
+    const newRange = document.createRange();
+    newRange.selectNodeContents(span);
+    selection.addRange(newRange);
+}
+
+
+function insertLineBreak() {
+    const editor = document.getElementById('admin-ad-content');
+    editor.focus();
+    document.execCommand('insertHTML', false, '<br><br>');
+}
+
+function insertLink() {
+    const url = prompt('أدخل رابط الصفحة (مثال: https://t.me/channel):');
+    if (!url) return;
+    const text = prompt('نص الرابط الذي سيظهر للمستخدم:') || url;
+    document.getElementById('admin-ad-content').focus();
+    document.execCommand('insertHTML', false, 
+        `<a href="${url}" target="_blank" style="color:var(--primary); text-decoration:underline;">${text}</a>`
+    );
+}
+
+function clearFormat() {
+    document.getElementById('admin-ad-content').focus();
+    document.execCommand('removeFormat', false, null);
 }
 
 async function fetchAdminLibrary() {
@@ -1047,14 +1142,16 @@ async function fetchUsers() {
 }
 
 async function addAd() {
-    const content = document.getElementById('admin-ad-content').value;
-    if (!content) return showToast('هيكل التعميم فارغ!', 'error');
+    const editorEl = document.getElementById('admin-ad-content');
+    const content = editorEl.innerHTML.trim();
+
+    if (!content || content === '') return showToast('هيكل التعميم فارغ!', 'error');
 
     const { error } = await sb.from('ads').insert([{ content }]);
     if (error) showToast('فشل في إرسال الإعلان.', 'error');
     else {
         showToast('تم تعميم الإعلان بنجاح!', 'success');
-        document.getElementById('admin-ad-content').value = '';
+        editorEl.innerHTML = '';
         fetchLatestAd();
         fetchAdminAds();
     }
@@ -1214,7 +1311,7 @@ function autoResizeTextarea(el) {
     el.style.height = 'auto';
     const newHeight = Math.min(el.scrollHeight, 120);
     el.style.height = newHeight + 'px';
-    
+
     // Adjust the dock position if needed, though 'fixed' should handle most cases
     const dock = el.closest('.ai-input-dock');
     if (dock) {
@@ -1344,10 +1441,10 @@ async function sendMessageToAI(customPrompt = null) {
 function appendChatBubble(role, content) {
     const chatWin = document.getElementById("chat-window");
     if (!chatWin) return;
-    
+
     const div = document.createElement("div");
     div.className = `chat-bubble ${role}`;
-    
+
     if (role === "ai") {
         const bubbleContent = document.createElement("div");
         bubbleContent.className = "bubble-content";
@@ -1356,7 +1453,7 @@ function appendChatBubble(role, content) {
 
         const actionsDiv = document.createElement("div");
         actionsDiv.className = "chat-actions";
-        
+
         const copyBtn = document.createElement("button");
         copyBtn.className = "copy-msg-btn-mini";
         copyBtn.innerHTML = `<i class="fa-solid fa-copy"></i> نسخ`;
@@ -1371,7 +1468,7 @@ function appendChatBubble(role, content) {
     } else {
         div.innerText = content;
     }
-    
+
     chatWin.appendChild(div);
     setTimeout(() => {
         chatWin.scrollTo({ top: chatWin.scrollHeight, behavior: "smooth" });
@@ -1383,7 +1480,7 @@ function formatAIResponse(text) {
     return (window.marked ? marked.parse(text) : text);
 }
 
-    
+
 function newChat() {
     state.ai.history = [];
     const chatWin = document.getElementById('chat-window');
@@ -1392,7 +1489,7 @@ function newChat() {
     chatWin.style.display = 'none';
     const welcomeMsg = document.getElementById('ai-welcome-msg');
     if (welcomeMsg) welcomeMsg.style.display = 'flex';
-    
+
     showToast('تم بدء محادثة جديدة بنجاح', 'info');
 }
 

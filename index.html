@@ -372,11 +372,31 @@
                 <div id="admin-announcement" class="admin-panel-section" style="display: none;">
                     <button class="btn glass-btn mb-2" onclick="switchAdminTab('dashboard-grid')">رجوع</button>
                     <div class="glass-card mb-2">
-                        <textarea id="admin-ad-content" placeholder="نص التبليغ..."></textarea>
-                        <button class="btn success-btn w-100" onclick="addAd()">نشر</button>
+                        <!-- شريط أدوات التنسيق -->
+                        <div class="rich-toolbar">
+                            <button type="button" onclick="formatText('bold')" title="غامق"><i class="fa-solid fa-bold"></i></button>
+                            <button type="button" onclick="formatText('underline')" title="تسطير"><i class="fa-solid fa-underline"></i></button>
+                            <button type="button" onclick="insertLineBreak()" title="سطر جديد"><i class="fa-solid fa-turn-down"></i></button>
+                            <button type="button" onclick="formatColor('#0ea5e9')" title="لون أزرق" style="color:#0ea5e9;"><i class="fa-solid fa-palette"></i></button>
+                            <button type="button" onclick="formatColor('#f59e0b')" title="لون ذهبي" style="color:#f59e0b;"><i class="fa-solid fa-palette"></i></button>
+                            <button type="button" onclick="formatColor('#10b981')" title="لون أخضر" style="color:#10b981;"><i class="fa-solid fa-palette"></i></button>
+                            <button type="button" onclick="formatColor('#ef4444')" title="لون أحمر" style="color:#ef4444;"><i class="fa-solid fa-palette"></i></button>
+                            <button type="button" onclick="formatColor('#ffffff')" title="أبيض" style="color:#fff; border:1px solid #555;"><i class="fa-solid fa-palette"></i></button>
+                            <button type="button" onclick="insertLink()" title="رابط"><i class="fa-solid fa-link"></i></button>
+                            <button type="button" onclick="clearFormat()" title="مسح التنسيق"><i class="fa-solid fa-eraser"></i></button>
+                        </div>
+                        <div id="admin-ad-content" 
+                             class="rich-editor" 
+                             contenteditable="true" 
+                             dir="rtl"
+                             data-placeholder="اكتب نص التبليغ هنا... يمكنك تحديد النص وتنسيقه"></div>
+                        <button class="btn success-btn w-100 mt-2" onclick="addAd()">
+                            <i class="fa-solid fa-bullhorn"></i> نشر التبليغ
+                        </button>
                     </div>
                     <div id="admin-ads-list"></div>
                 </div>
+
 
                 <div id="admin-library-add" class="admin-panel-section" style="display: none;">
                     <button class="btn glass-btn mb-2" onclick="switchAdminTab('dashboard-grid')">رجوع</button>
