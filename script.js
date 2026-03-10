@@ -1619,6 +1619,126 @@ function showSection(sectionId) {
     }
 }
 
+// ====== نظام التحديث التلقائي ======
+if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('/sw.js').then(reg => {
+        console.log('✅ Service Worker مسجل بنجاح');
+
+        // التحقق من التحديثات كل دقيقة
+        setInterval(() => {
+            reg.update();
+        }, 60000);
+
+        // الاستماع لرسائل Service Worker
+        navigator.serviceWorker.addEventListener('message', event => {
+            if (event.data && event.data.type === 'UPDATE_AVAILABLE') {
+                showUpdateNotification(event.data.version);
+            }
+        });
+    });
+}
+
+// 🔔 إظهار رسالة التحديث
+function showUpdateNotification(version) {
+    // إنشاء عنصر الإشعار
+    const notification = document.createElement('div');
+    notification.id = 'update-notification';
+    notification.innerHTML = `
+        <div style="
+            position: fixed;
+            bottom: 80px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 90%;
+            max-width: 400px;
+            background: linear-gradient(135deg, #0ea5e9, #06b6d4);
+            color: #fff;
+            padding: 1rem 1.2rem;
+            border-radius: 16px;
+            box-shadow: 0 10px 40px rgba(14, 165, 233, 0.4);
+            z-index: 10000;
+            animation: slideUpNotif 0.4s ease;
+            text-align: center;
+        ">
+            <div style="display: flex; align-items: center; gap: 0.8rem; margin-bottom: 0.8rem;">
+                <i class="fa-solid fa-rocket" style="font-size: 1.5rem;"></i>
+                <div style="flex: 1; text-align: right;">
+                    <h4 style="margin: 0; font-size: 1rem; font-weight: 800;">🎉 تحديث جديد متوفر!</h4>
+                    <p style="margin: 0.2rem 0 0; font-size: 0.75rem; opacity: 0.9;">${version}</p>
+                </div>
+            </div>
+            <button onclick="reloadApp()" style="
+                width: 100%;
+                background: #fff;
+                color: #0ea5e9;
+                border: none;
+                padding: 0.7rem;
+                border-radius: 10px;
+                font-weight: 800;
+                font-size: 0.9rem;
+                cursor: pointer;
+                transition: 0.2s;
+            " onmouseover="this.style.transform='scale(1.05)'" onmouseout="this.style.transform='scale(1)'">
+                <i class="fa-solid fa-rotate-right"></i> تحديث الآن
+            </button>
+            <button onclick="dismissUpdate()" style="
+                margin-top: 0.5rem;
+                background: transparent;
+                color: #fff;
+                border: 1px solid rgba(255,255,255,0.3);
+                padding: 0.5rem;
+                border-radius: 8px;
+                font-size: 0.8rem;
+                cursor: pointer;
+                width: 100%;
+            ">
+                لاحقاً
+            </button>
+        </div>
+    `;
+
+    // إضافة الأنيميشن
+    const style = document.createElement('style');
+    style.textContent = `
+        @keyframes slideUpNotif {
+            from { opacity: 0; transform: translateX(-50%) translateY(30px); }
+            to { opacity: 1; transform: translateX(-50%) translateY(0); }
+        }
+    `;
+    document.head.appendChild(style);
+
+    // إزالة الإشعار القديم إن وُجد
+    const oldNotif = document.getElementById('update-notification');
+    if (oldNotif) oldNotif.remove();
+
+    document.body.appendChild(notification);
+
+    // حفظ في LocalStorage لعرضه مرة واحدة فقط
+    localStorage.setItem('pendingUpdate', version);
+}
+
+// ✅ إعادة تحميل التطبيق
+function reloadApp() {
+    localStorage.removeItem('pendingUpdate');
+    window.location.reload(true);
+}
+
+// ❌ إخفاء الإشعار
+function dismissUpdate() {
+    const notif = document.getElementById('update-notification');
+    if (notif) {
+        notif.style.animation = 'slideUpNotif 0.3s ease reverse';
+        setTimeout(() => notif.remove(), 300);
+    }
+}
+
+// التحقق عند فتح التطبيق
+window.addEventListener('load', () => {
+    const pendingUpdate = localStorage.getItem('pendingUpdate');
+    if (pendingUpdate && pendingUpdate !== 'oxygen-v1.2.0') {
+        setTimeout(() => showUpdateNotification(pendingUpdate), 2000);
+    }
+});
 
 
 
