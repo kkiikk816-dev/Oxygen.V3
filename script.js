@@ -4,6 +4,7 @@ const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJ
 
 const sb = supabase.createClient(SB_URL, SB_KEY);
 
+
 // Application State
 const state = {
     user: null,
@@ -359,6 +360,7 @@ function navigate(pageId) {
     } else {
         document.body.classList.remove('ai-active');
     }
+    
 
     if (pageId === 'admin') {
         switchAdminTab('dashboard-grid');
@@ -876,7 +878,61 @@ async function fetchSchedule() {
     }
 }
 
+// ===== 1. fetchTodaySchedule =====
+async function fetchTodaySchedule() {
+    const list = document.getElementById('today-schedule-list');
+    if (!list) return;
 
+    const days = ['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'];
+    const todayName = days[new Date().getDay()];
+
+    const { data } = await sb.from('schedule').select('*').eq('day', todayName).order('time');
+
+    if (!data || data.length === 0) {
+        list.innerHTML = `
+            <div style="padding:1rem; text-align:center; color:var(--text-muted); font-size:0.8rem;">
+                <i class="fa-solid fa-moon"></i> لا توجد محاضرات اليوم
+            </div>`;
+        return;
+    }
+
+    list.innerHTML = data.map(s => `
+        <div class="today-sched-item">
+            <div class="today-sched-info">
+                <span class="today-sched-subject">${s.subject}</span>
+                <span class="today-sched-meta">
+                    <i class="fa-regular fa-clock"></i> ${s.time} &nbsp;|&nbsp;
+                    <i class="fa-solid fa-location-dot"></i> ${s.hall}
+                </span>
+            </div>
+        </div>
+    `).join('');
+}
+
+// ===== 2. loadDefaultSchedule =====
+async function loadDefaultSchedule() {
+    await fetchTodaySchedule();
+}
+
+// ===== 3. setupBottomNavScroll =====
+function setupBottomNavScroll() {
+    const nav = document.getElementById('bottom-nav');
+    if (!nav) return;
+
+    let lastScroll = 0;
+    const mainContent = document.querySelector('.main-content');
+    if (!mainContent) return;
+
+    mainContent.addEventListener('scroll', () => {
+        const current = mainContent.scrollTop;
+        if (current > lastScroll && current > 50) {
+            nav.classList.add('hide');
+        } else {
+            nav.classList.remove('hide');
+        }
+        lastScroll = current;
+    }, { passive: true });
+}
 
 
 // 9. Profile Update (`profiles`)
@@ -911,6 +967,7 @@ function switchAdminTab(tab) {
     if (tab === 'quiz-add') fetchAdminQuizzes();
     if (tab === 'buddy-mgr') fetchAdminBuddies();
 }
+
 
 async function fetchAdminAds() {
     const list = document.getElementById('admin-ads-list');
@@ -1244,6 +1301,8 @@ async function addScheduleItem() {
         btn.innerHTML = originalText;
     }
 }
+
+
 
 // --- AI Buddy & Groq API Integration ---
 
