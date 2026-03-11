@@ -119,8 +119,9 @@
                 <li onclick="navigate('skills'); closeSidebar()"><i class="fa-solid fa-clipboard-list"></i> المهارات
                 </li>
                 <li onclick="navigate('quizzes'); closeSidebar()"><i class="fa-solid fa-lightbulb"></i> الكويزات</li>
-
-
+                <li onclick="navigate('qbank'); closeSidebar()">
+                    <i class="fa-solid fa-layer-group"></i> بنك الأسئلة
+                </li>
 
                 <li onclick="navigate('chat'); closeSidebar()"><i class="fa-solid fa-brain"></i> AI Buddy</li>
                 <li onclick="navigate('tools'); closeSidebar()"><i class="fa-solid fa-kit-medical"></i> الأدوات</li>
@@ -186,6 +187,55 @@
                     <!-- Injected via JS -->
                 </div>
             </section>
+
+            <section id="page-qbank" class="page" style="display:none;">
+                <h2 class="page-title"><i class="fa-solid fa-database"></i> بنك الأسئلة</h2>
+
+                <!-- عرض المواد -->
+                <div id="qb-subjects-view">
+                    <p class="text-muted" style="font-size:0.85rem; margin-bottom:1rem;">اختر المادة للبدء</p>
+                    <div id="qb-subjects-grid" class="qbank-grid"></div>
+                </div>
+
+                <!-- عرض المحاضرات -->
+                <div id="qb-lectures-view" style="display:none;">
+                    <button class="qbank-back-btn" onclick="qbankShowSubjectsView()">
+                        <i class="fa-solid fa-arrow-right"></i> رجوع
+                    </button>
+                    <p id="qb-selected-subject-label" class="text-primary" style="font-weight:800; margin-bottom:1rem;"></p>
+                    <div id="qb-lectures-grid" class="qbank-grid"></div>
+                </div>
+
+                <!-- الاختبار -->
+                <div id="qb-quiz-view" style="display:none;">
+                    <button class="qbank-back-btn" onclick="qbankShowSubjectsView()">
+                        <i class="fa-solid fa-arrow-right"></i> رجوع للمواد
+                    </button>
+                    <div class="qbank-progress-bar-wrap">
+                        <div id="qb-progress-fill" class="qbank-progress-bar-fill"></div>
+                    </div>
+                    <p id="qb-counter" class="text-muted" style="font-size:0.75rem; text-align:center; margin-bottom:1rem;"></p>
+                    <div class="qbank-question-card glass-card">
+                        <p id="qb-question-text" class="qbank-question-text"></p>
+                        <div id="qb-options"></div>
+                        <div id="qb-feedback" class="feedback mt-2" style="display:none;"></div>
+                        <button id="qb-next-btn" class="btn primary-btn mt-2" style="display:none;" onclick="qbNextQuestion()">التالي</button>
+                    </div>
+                </div>
+
+                <!-- النتيجة -->
+                <div id="qb-result-view" style="display:none;">
+                    <div class="glass-card text-center" style="padding:2rem;">
+                        <div id="qb-result-emoji" style="font-size:3rem; margin-bottom:1rem;"></div>
+                        <h3 id="qb-result-title" style="font-size:1.4rem; font-weight:800; margin-bottom:0.5rem;"></h3>
+                        <p id="qb-result-score" class="text-primary" style="font-size:1.1rem; font-weight:700;"></p>
+                        <button class="btn primary-btn mt-3" onclick="qbankShowSubjectsView()">
+                            <i class="fa-solid fa-rotate-right"></i> العودة للمواد
+                        </button>
+                    </div>
+                </div>
+            </section>
+
             
             <!-- Schedule -->
             <section id="page-schedule" class="page" style="display: none;">

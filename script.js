@@ -362,9 +362,12 @@ function navigate(pageId) {
     }
     
 
+    if (pageId === 'qbank') initQBank();
+
     if (pageId === 'admin') {
         switchAdminTab('dashboard-grid');
     }
+
 
     document.querySelectorAll('.nav-item').forEach(nav => {
         nav.classList.remove('active');
@@ -1619,6 +1622,187 @@ function showSection(sectionId) {
     }
 }
 
+
+// ===== Question Bank - Student =====
+const qbState = {
+    selectedSubject: '',
+    selectedLecture: '',
+    questions: [],
+    currentIdx: 0,
+    score: 0
+};
+
+function initQBank() {
+    const sv = document.getElementById('qb-subjects-view');
+    if (!sv) {
+        alert('qb-subjects-view غير موجود في HTML!');
+        return;
+    }
+    sv.style.display = 'block';
+    document.getElementById('qb-lectures-view').style.display = 'none';
+    document.getElementById('qb-quiz-view').style.display = 'none';
+    document.getElementById('qb-result-view').style.display = 'none';
+    loadQBankSubjects();
+}
+
+
+async function loadQBankSubjects() {
+    const grid = document.getElementById('qb-subjects-grid');
+    if (!grid) return;
+    grid.innerHTML = '<p class="text-muted text-center">جاري التحميل...</p>';
+
+    const { data, error } = await sb.from('question_bank').select('subject');
+    if (error || !data || data.length === 0) {
+        grid.innerHTML = '<p class="text-muted text-center">لا توجد أسئلة حالياً</p>';
+        return;
+    }
+
+    const subjects = [...new Set(data.map(r => r.subject).filter(Boolean))];
+
+    grid.innerHTML = '';
+    subjects.forEach(s => {
+        const btn = document.createElement('button');
+        btn.className = 'qbank-subject-btn';
+        btn.innerHTML = `<i class="fa-solid fa-book-medical"></i><span>${s}</span>`;
+        btn.onclick = () => qbankSelectSubject(s);
+        grid.appendChild(btn);
+    });
+}
+
+
+
+async function qbankSelectSubject(subject) {
+    qbState.selectedSubject = subject;
+    document.getElementById('qb-subjects-view').style.display = 'none';
+    document.getElementById('qb-lectures-view').style.display = 'block';
+    document.getElementById('qb-selected-subject-label').textContent = subject;
+
+    const grid = document.getElementById('qb-lectures-grid');
+    grid.innerHTML = '<p class="text-muted text-center">جاري التحميل...</p>';
+
+    const { data } = await sb.from('question_bank').select('lecture').eq('subject', subject);
+    const lectures = [...new Set(data?.map(r => r.lecture).filter(Boolean))];
+
+    grid.innerHTML = `
+        <button class="lecture-btn" onclick="qbankStartQuiz('${subject}', null)">
+            <i class="fa-solid fa-layer-group" style="color:var(--primary);font-size:1.3rem;"></i>
+            <span>كل الأسئلة</span>
+        </button>
+    ` + lectures.map(l => `
+        <button class="lecture-btn" onclick="qbankStartQuiz('${subject}', '${l}')">
+            <i class="fa-solid fa-file-lines" style="color:var(--secondary);font-size:1.3rem;"></i>
+            <span>${l}</span>
+        </button>
+    `).join('');
+}
+
+async function qbankStartQuiz(subject, lecture) {
+    let query = sb.from('question_bank').select('*').eq('subject', subject);
+    if (lecture) query = query.eq('lecture', lecture);
+    const { data } = await query;
+
+    if (!data || data.length === 0) { showToast('لا توجد أسئلة لهذه المحاضرة حالياً', 'info'); return; }
+
+    qbState.questions = data.sort(() => Math.random() - 0.5);
+    qbState.currentIdx = 0;
+    qbState.score = 0;
+
+    document.getElementById('qb-lectures-view').style.display = 'none';
+    document.getElementById('qb-quiz-view').style.display = 'block';
+    document.getElementById('qb-result-view').style.display = 'none';
+    qbRenderQuestion();
+}
+
+function qbRenderQuestion() {
+    const q = qbState.questions[qbState.currentIdx];
+    const total = qbState.questions.length;
+    const idx = qbState.currentIdx;
+
+    document.getElementById('qb-progress-fill').style.width = ((idx / total) * 100) + '%';
+    document.getElementById('qb-counter').textContent = `سؤال ${idx + 1} من ${total}`;
+    document.getElementById('qb-question-text').textContent = q.question;
+    document.getElementById('qb-feedback').style.display = 'none';
+    document.getElementById('qb-next-btn').style.display = 'none';
+
+    const optionsDiv = document.getElementById('qb-options');
+    optionsDiv.innerHTML = '';
+    optionsDiv.classList.remove('answered');
+
+    [{ id: 'a', text: q.option_a }, { id: 'b', text: q.option_b },
+     { id: 'c', text: q.option_c }, { id: 'd', text: q.option_d }]
+    .filter(o => o.text)
+    .forEach(opt => {
+        const btn = document.createElement('div');
+        btn.className = 'quiz-option';
+        btn.innerHTML = `<span style="font-weight:800;color:var(--primary);min-width:20px;">${opt.id.toUpperCase()}.</span> ${opt.text}`;
+        btn.onclick = () => qbAnswer(opt.id, q.correct_option, btn, optionsDiv);
+        optionsDiv.appendChild(btn);
+    });
+}
+
+function qbAnswer(selected, correct, btn, optionsDiv) {
+    if (optionsDiv.classList.contains('answered')) return;
+    optionsDiv.classList.add('answered');
+
+    const isCorrect = selected === correct;
+    if (isCorrect) qbState.score++;
+
+    Array.from(optionsDiv.children).forEach((child, idx) => {
+        const optId = ['a','b','c','d'][idx];
+        if (optId === correct) child.classList.add('correct');
+        else if (child === btn && !isCorrect) child.classList.add('wrong');
+        child.onclick = null;
+    });
+
+    const feedbackEl = document.getElementById('qb-feedback');
+    feedbackEl.style.display = 'block';
+    feedbackEl.innerHTML = isCorrect
+        ? `<strong class="text-success"><i class="fa-solid fa-check"></i> إجابة صحيحة!</strong>`
+        : `<strong class="text-danger"><i class="fa-solid fa-times"></i> إجابة خاطئة!</strong> الصحيحة: <strong class="text-success">${correct.toUpperCase()}</strong>`;
+
+    const nextBtn = document.getElementById('qb-next-btn');
+    nextBtn.style.display = 'block';
+    const isLast = qbState.currentIdx >= qbState.questions.length - 1;
+    nextBtn.innerHTML = isLast
+        ? '<i class="fa-solid fa-flag-checkered"></i> إنهاء الاختبار'
+        : 'التالي <i class="fa-solid fa-arrow-left"></i>';
+}
+
+function qbNextQuestion() {
+    if (qbState.currentIdx >= qbState.questions.length - 1) {
+        qbShowResult();
+    } else {
+        qbState.currentIdx++;
+        qbRenderQuestion();
+    }
+}
+
+function qbShowResult() {
+    document.getElementById('qb-quiz-view').style.display = 'none';
+    document.getElementById('qb-result-view').style.display = 'block';
+
+    const score = qbState.score;
+    const total = qbState.questions.length;
+    const percent = Math.round((score / total) * 100);
+
+    let emoji = '😐', title = 'يمكنك التحسن!';
+    if (percent >= 80) { emoji = '🎉'; title = 'ممتاز! أداء رائع!'; }
+    else if (percent >= 60) { emoji = '👍'; title = 'جيد، استمر!'; }
+
+    document.getElementById('qb-result-emoji').textContent = emoji;
+    document.getElementById('qb-result-title').textContent = title;
+    document.getElementById('qb-result-score').textContent = `${score} / ${total} (${percent}%)`;
+    document.getElementById('qb-progress-fill').style.width = '100%';
+}
+
+function qbankShowSubjectsView() {
+    document.getElementById('qb-subjects-view').style.display = 'block';
+    document.getElementById('qb-lectures-view').style.display = 'none';
+    document.getElementById('qb-quiz-view').style.display = 'none';
+    document.getElementById('qb-result-view').style.display = 'none';
+    loadQBankSubjects();
+}
+
 // ====== نظام التحديث التلقائي ======
 if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('/sw.js').then(reg => {
@@ -1739,7 +1923,6 @@ window.addEventListener('load', () => {
         setTimeout(() => showUpdateNotification(pendingUpdate), 2000);
     }
 });
-
 
 
 // دالة إعداد تطبيق الويب التقدمي (PWA)

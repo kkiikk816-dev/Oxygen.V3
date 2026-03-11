@@ -2749,3 +2749,81 @@ body {
     gap: 0.3rem;
 }
 
+
+
+/* ===== Question Bank ===== */
+.qbank-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.8rem;
+    margin-bottom: 1rem;
+}
+
+.qbank-subject-btn, .lecture-btn {
+    padding: 1.2rem 0.8rem;
+    text-align: center;
+    background: var(--glass-bg);
+    border: 1px solid var(--glass-border);
+    border-radius: 16px;
+    color: var(--text-main);
+    font-weight: 800;
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.5rem;
+    width: 100%;
+}
+
+.qbank-subject-btn:hover, .lecture-btn:hover {
+    border-color: var(--primary);
+    background: var(--primary-glow);
+    transform: translateY(-3px);
+}
+
+.qbank-subject-btn i { font-size: 1.5rem; color: var(--primary); }
+
+.qbank-back-btn {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    background: rgba(255,255,255,0.05);
+    border: 1px solid var(--glass-border);
+    border-radius: 30px;
+    color: var(--text-muted);
+    padding: 0.4rem 1rem;
+    font-size: 0.8rem;
+    font-weight: 700;
+    cursor: pointer;
+    margin-bottom: 1rem;
+    transition: 0.2s;
+}
+
+.qbank-back-btn:hover { color: #fff; border-color: var(--primary); }
+
+.qbank-progress-bar-wrap {
+    background: rgba(255,255,255,0.05);
+    border-radius: 20px;
+    height: 6px;
+    margin-bottom: 0.5rem;
+    overflow: hidden;
+}
+
+.qbank-progress-bar-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--primary), var(--success));
+    border-radius: 20px;
+    transition: width 0.4s ease;
+    width: 0%;
+}
+
+.qbank-question-card { padding: 1.2rem; }
+
+.qbank-question-text {
+    font-size: 1rem;
+    font-weight: 700;
+    line-height: 1.7;
+    margin-bottom: 1.2rem;
+}
