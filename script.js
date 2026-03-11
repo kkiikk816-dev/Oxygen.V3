@@ -1201,79 +1201,199 @@ async function fetchUsers() {
     });
 }
 
+// ============================
+// إضافة تبليغ (مُحسّن)
+// ============================
 async function addAd() {
     const editorEl = document.getElementById('admin-ad-content');
     const content = editorEl.innerHTML.trim();
 
-    if (!content || content === '') return showToast('هيكل التعميم فارغ!', 'error');
+    // 1. التحقق من البيانات أولاً
+    if (!content || content === '') {
+        showToast('هيكل التعميم فارغ!', 'error');
+        return;
+    }
 
-    const { error } = await sb.from('ads').insert([{ content }]);
-    if (error) showToast('فشل في إرسال الإعلان.', 'error');
-    else {
+    // 2. الحصول على الزر بعد التأكد من صحة البيانات
+    const btn = event?.target || document.querySelector('#admin-announcement .primary-btn');
+    if (!btn) {
+        console.error('Button not found');
+        return;
+    }
+
+    // 3. تفعيل حالة التحميل
+    const originalText = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> جاري النشر...';
+
+    try {
+        const { error } = await sb.from('ads').insert([{ content }]);
+
+        if (error) {
+            throw error;
+        }
+
         showToast('تم تعميم الإعلان بنجاح!', 'success');
         editorEl.innerHTML = '';
-        fetchLatestAd();
-        fetchAdminAds();
+
+        // تحديث البيانات
+        if (typeof fetchLatestAd === 'function') await fetchLatestAd();
+        if (typeof fetchAdminAds === 'function') await fetchAdminAds();
+
+    } catch (err) {
+        console.error('Error adding ad:', err);
+        showToast('فشل في إرسال الإعلان: ' + err.message, 'error');
+    } finally {
+        // إعادة الزر لحالته الطبيعية
+        btn.disabled = false;
+        btn.innerHTML = originalText;
     }
 }
 
+// ============================
+// إضافة محاضرة للمكتبة (مُحسّن)
+// ============================
 async function addLibraryItem() {
-    const title = document.getElementById('admin-lib-title').value;
-    const link = document.getElementById('admin-lib-link').value;
-    const subject_type = document.getElementById('admin-lib-type').value;
+    const title = document.getElementById('admin-lib-title').value.trim();
+    const link = document.getElementById('admin-lib-link').value.trim();
+    const subject_type = document.getElementById('admin-lib-type').value.trim();
 
-    if (!title || !link || !subject_type) return showToast('رابط وملف المصدر ضروري للمكتبة', 'error');
+    // 1. التحقق من البيانات أولاً
+    if (!title || !link || !subject_type) {
+        showToast('رابط وملف المصدر ضروري للمكتبة', 'error');
+        return;
+    }
 
-    const { error } = await sb.from('lectures').insert([{ title, link, subject_type }]);
-    if (error) showToast('فشل التوثيق بسبب عطل بالخادم', 'error');
-    else {
+    // 2. الحصول على الزر
+    const btn = event?.target || document.querySelector('#admin-library-add .primary-btn');
+    if (!btn) {
+        console.error('Button not found');
+        return;
+    }
+
+    const originalText = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> جاري الإضافة...';
+
+    try {
+        const { error } = await sb.from('lectures').insert([{ title, link, subject_type }]);
+
+        if (error) {
+            throw error;
+        }
+
         showToast('صعد الكتاب للمكتبة بنجاح!', 'success');
+
+        // تصفير الحقول
         document.getElementById('admin-lib-title').value = '';
         document.getElementById('admin-lib-link').value = '';
         document.getElementById('admin-lib-type').value = '';
-        fetchLibrary();
-        fetchAdminLibrary();
+
+        // تحديث البيانات
+        if (typeof fetchLibrary === 'function') await fetchLibrary();
+        if (typeof fetchAdminLibrary === 'function') await fetchAdminLibrary();
+
+    } catch (err) {
+        console.error('Error adding library item:', err);
+        showToast('فشل التوثيق: ' + err.message, 'error');
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = originalText;
     }
 }
 
+// ============================
+// إضافة سؤال يومي (مُحسّن)
+// ============================
 async function addDailyQuiz() {
-    const question = document.getElementById('admin-quiz-q').value;
-    const option_a = document.getElementById('admin-quiz-oa').value;
-    const option_b = document.getElementById('admin-quiz-ob').value;
-    const option_c = document.getElementById('admin-quiz-oc').value;
+    const question = document.getElementById('admin-quiz-q').value.trim();
+    const option_a = document.getElementById('admin-quiz-oa').value.trim();
+    const option_b = document.getElementById('admin-quiz-ob').value.trim();
+    const option_c = document.getElementById('admin-quiz-oc').value.trim();
     const correct_option = document.getElementById('admin-quiz-ans').value;
-    const explanation = document.getElementById('admin-quiz-exp').value;
+    const explanation = document.getElementById('admin-quiz-exp').value.trim();
 
-    if (!question || !option_a || !option_b || !option_c) return showToast('الاستمارة تحتاج نص وأجوبة لتتأكد من إرسال سؤال طبي مكتمل.', 'error');
+    // 1. التحقق من البيانات أولاً
+    if (!question || !option_a || !option_b || !option_c) {
+        showToast('الاستمارة تحتاج نص وأجوبة لتتأكد من إرسال سؤال طبي مكتمل.', 'error');
+        return;
+    }
 
-    const { error } = await sb.from('daily_quiz').insert([{
-        question, option_a, option_b, option_c,
-        correct_option, explanation
-    }]);
+    if (!correct_option) {
+        showToast('يرجى تحديد الإجابة الصحيحة!', 'error');
+        return;
+    }
 
-    if (error) showToast('حدث خلل ما في السند للبيانات.', 'error');
-    else {
+    // 2. الحصول على الزر
+    const btn = event?.target || document.querySelector('#admin-quiz-add .primary-btn');
+    if (!btn) {
+        console.error('Button not found');
+        return;
+    }
+
+    const originalText = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> جاري النشر...';
+
+    try {
+        const { error } = await sb.from('daily_quiz').insert([{
+            question, 
+            option_a, 
+            option_b, 
+            option_c,
+            correct_option, 
+            explanation
+        }]);
+
+        if (error) {
+            throw error;
+        }
+
         showToast('تم تدشين السؤال الحصري اليومي!', 'success');
+
+        // تصفير الحقول
         document.getElementById('admin-quiz-q').value = '';
         document.getElementById('admin-quiz-oa').value = '';
         document.getElementById('admin-quiz-ob').value = '';
         document.getElementById('admin-quiz-oc').value = '';
         document.getElementById('admin-quiz-exp').value = '';
-        fetchQuiz();
-        fetchAdminQuizzes();
+        document.getElementById('admin-quiz-ans').value = '';
+
+        // تحديث البيانات
+        if (typeof fetchQuiz === 'function') await fetchQuiz();
+        if (typeof fetchAdminQuizzes === 'function') await fetchAdminQuizzes();
+
+    } catch (err) {
+        console.error('Error adding quiz:', err);
+        showToast('حدث خلل: ' + err.message, 'error');
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = originalText;
     }
 }
 
+// ============================
+// إضافة محاضرة للجدول (مُحسّن)
+// ============================
 async function addScheduleItem() {
-    const btn = event?.target || document.querySelector('#admin-schedule-add .primary-btn');
     const day = document.getElementById('admin-sched-day').value;
-    const subject = document.getElementById('admin-sched-subject').value;
-    const time = document.getElementById('admin-sched-time').value;
-    const hall = document.getElementById('admin-sched-hall').value;
+    const subject = document.getElementById('admin-sched-subject').value.trim();
+    const time = document.getElementById('admin-sched-time').value.trim();
+    const hall = document.getElementById('admin-sched-hall').value.trim();
 
-    if (!subject || !time || !hall) return showToast('يرجى ملء جميع البيانات.', 'error');
+    // 1. التحقق من البيانات أولاً
+    if (!subject || !time || !hall) {
+        showToast('يرجى ملء جميع البيانات.', 'error');
+        return;
+    }
 
-    // 1. تفعيل حالة التحميل وتعطيل الزر لمنع التجمد
+    // 2. الحصول على الزر
+    const btn = event?.target || document.querySelector('#admin-schedule-add .primary-btn');
+    if (!btn) {
+        console.error('Button not found');
+        return;
+    }
+
     const originalText = btn.innerHTML;
     btn.disabled = true;
     btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> جاري الإضافة...';
@@ -1282,24 +1402,25 @@ async function addScheduleItem() {
         const { error } = await sb.from('schedule').insert([{ day, subject, time, hall }]);
 
         if (error) {
-            showToast('حدث خطأ في قاعدة البيانات: ' + error.message, 'error');
-        } else {
-            showToast('تمت إضافة المحاضرة بنجاح!', 'success');
-
-            // 2. تصفير الحقول
-            document.getElementById('admin-sched-subject').value = '';
-            document.getElementById('admin-sched-time').value = '';
-            document.getElementById('admin-sched-hall').value = '';
-
-            // 3. تحديث البيانات (تأكد من وجود هذه الوظائف)
-            if (typeof fetchSchedule === "function") await fetchSchedule();
-            if (typeof fetchAdminSchedule === "function") await fetchAdminSchedule();
+            throw error;
         }
+
+        showToast('تمت إضافة المحاضرة بنجاح!', 'success');
+
+        // تصفير الحقول
+        document.getElementById('admin-sched-subject').value = '';
+        document.getElementById('admin-sched-time').value = '';
+        document.getElementById('admin-sched-hall').value = '';
+
+        // تحديث البيانات
+        if (typeof fetchSchedule === 'function') await fetchSchedule();
+        if (typeof fetchAdminSchedule === 'function') await fetchAdminSchedule();
+        if (typeof fetchTodaySchedule === 'function') await fetchTodaySchedule();
+
     } catch (err) {
-        console.error("Critical Error:", err);
-        showToast('حدث خطأ غير متوقع في النظام.', 'error');
+        console.error('Error adding schedule:', err);
+        showToast('حدث خطأ: ' + err.message, 'error');
     } finally {
-        // 4. إعادة الزر لحالته الطبيعية
         btn.disabled = false;
         btn.innerHTML = originalText;
     }
@@ -1307,7 +1428,13 @@ async function addScheduleItem() {
 
 
 
+
+
 // --- AI Buddy & Groq API Integration ---
+
+// ============================
+// 2. PDF UPLOAD & PROCESSING
+// ============================
 
 async function handlePDFUpload(event) {
     const files = event.target.files;
@@ -1324,6 +1451,7 @@ async function handlePDFUpload(event) {
             showToast(`الملف ${f.name} غير مدعوم. يرجى رفع ملفات PDF فقط.`, 'error');
             continue;
         }
+
         try {
             const arrayBuffer = await f.arrayBuffer();
             const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
@@ -1332,28 +1460,57 @@ async function handlePDFUpload(event) {
             for (let i = 1; i <= pdf.numPages; i++) {
                 const page = await pdf.getPage(i);
                 const textContent = await page.getTextContent();
-                fullText += textContent.items.map(item => item.str).join(' ') + "\n";
+                const pageText = textContent.items.map(item => item.str).join(' ');
+
+                // تنظيف النص من الأحرف الغريبة والرموز غير المرغوبة
+                const cleanedText = pageText
+                    .replace(/[^\u0000-\u007F\u0600-\u06FF\s\d.,;:()\-]/g, '') // إزالة الرموز الغريبة
+                    .replace(/\s+/g, ' ') // توحيد المسافات
+                    .replace(/\n{3,}/g, '\n\n') // تنظيف السطور الفارغة
+                    .trim();
+
+                fullText += cleanedText + "\n";
             }
+
             state.ai.pdfTexts.push(fullText);
+
+            // تحديث واجهة المستخدم
             document.getElementById('ai-welcome-msg').style.display = 'none';
             const chatWin = document.getElementById('chat-window');
             chatWin.style.display = 'flex';
             chatWin.classList.remove('empty-state');
+
             renderPDFTags();
+            showToast(`تم رفع ${f.name} بنجاح ✓`, 'success');
+
         } catch (err) {
             console.error('PDF Error:', err);
-            showToast(`فشل قراءة ${f.name}`, 'error');
+            showToast(`فشل قراءة ${f.name}. حاول مرة أخرى.`, 'error');
         }
+    }
+
+    // تحديث شريط الحالة
+    if (state.ai.pdfTexts.length > 0) {
+        listNames.innerHTML = state.ai.pdfTexts.map((txt, idx) => {
+            const name = txt.match(/\[المصدر: (.*?)\]/)?.[1] || `ملف ${idx + 1}`;
+            return `
+                <div class="action-mini-btn" style="background:var(--primary-glow); color:var(--primary); white-space:nowrap;">
+                    <i class="fa-solid fa-file-pdf"></i> ${name.substring(0, 12)}...
+                </div>
+            `;
+        }).join('');
     }
 }
 
 function renderPDFTags() {
     const listNames = document.getElementById('pdf-list-names');
+    if (!listNames) return;
+
     listNames.innerHTML = state.ai.pdfTexts.map((txt, idx) => {
         const name = txt.match(/\[المصدر: (.*?)\]/)?.[1] || `ملف ${idx + 1}`;
         return `
             <div class="action-mini-btn" style="background:var(--primary-glow); color:var(--primary); white-space:nowrap;">
-                <i class="fa-solid fa-file-pdf"></i> ${name.substring(0, 10)}...
+                <i class="fa-solid fa-file-pdf"></i> ${name.substring(0, 12)}...
             </div>
         `;
     }).join('');
@@ -1361,7 +1518,21 @@ function renderPDFTags() {
 
 function clearPDFs() {
     state.ai.pdfTexts = [];
-    document.getElementById('pdf-status-bar').style.display = 'none';
+    state.ai.history = [];
+
+    const statusBar = document.getElementById('pdf-status-bar');
+    if (statusBar) statusBar.style.display = 'none';
+
+    const chatWin = document.getElementById('chat-window');
+    if (chatWin) {
+        chatWin.innerHTML = '';
+        chatWin.style.display = 'none';
+        chatWin.classList.add('empty-state');
+    }
+
+    const welcomeMsg = document.getElementById('ai-welcome-msg');
+    if (welcomeMsg) welcomeMsg.style.display = 'flex';
+
     showToast('تم إفراغ المحاضرات المرفوعة', 'info');
 }
 
@@ -1369,30 +1540,42 @@ function handlePDFManualTrigger() {
     document.getElementById('pdf-upload-input').click();
 }
 
+// ============================
+// 3. UI HELPERS
+// ============================
+
 function autoResizeTextarea(el) {
+    if (!el) return;
+
     el.style.height = 'auto';
     const newHeight = Math.min(el.scrollHeight, 120);
     el.style.height = newHeight + 'px';
 
-    // Adjust the dock position if needed, though 'fixed' should handle most cases
+    // إصلاح مشكلة القفز
     const dock = el.closest('.ai-input-dock');
     if (dock) {
-        // Ensure the dock doesn't jump
         dock.style.transition = 'none';
+        setTimeout(() => {
+            dock.style.transition = '';
+        }, 10);
     }
 }
 
 function handleChatAction() {
     if (state.ai.controller) {
+        // إيقاف التوليد
         state.ai.controller.abort();
         state.ai.controller = null;
         setChatLoading(false);
         showToast('تم إيقاف التوليد', 'info');
     } else {
+        // إرسال رسالة جديدة
         const chatWin = document.getElementById('chat-window');
         const welcomeMsg = document.getElementById('ai-welcome-msg');
+
         if (welcomeMsg) welcomeMsg.style.display = 'none';
         if (chatWin) chatWin.style.display = 'flex';
+
         sendMessageToAI();
     }
 }
@@ -1401,6 +1584,8 @@ function setChatLoading(loading) {
     const btn = document.getElementById('send-ai-btn');
     const sendIcon = document.getElementById('send-icon');
     const stopIcon = document.getElementById('stop-icon');
+
+    if (!btn || !sendIcon || !stopIcon) return;
 
     if (loading) {
         btn.classList.add('stopping');
@@ -1413,46 +1598,99 @@ function setChatLoading(loading) {
     }
 }
 
+// ============================
+// 4. AI CHAT FUNCTIONALITY
+// ============================
+
 async function sendMessageToAI(customPrompt = null) {
     const inputEl = document.getElementById('ai-chat-input');
     const question = customPrompt || (inputEl ? inputEl.value.trim() : null);
 
-    if (!question) return;
+    if (!question) {
+        showToast('الرجاء كتابة سؤال أولاً', 'warning');
+        return;
+    }
 
-    // 1. إدارة الإلغاء بشكل آمن لمنع تداخل الطلبات
+    // إلغاء أي طلب سابق
     if (state.ai.controller) {
         state.ai.controller.abort();
     }
     state.ai.controller = new AbortController();
 
+    // إضافة رسالة المستخدم
     if (!customPrompt && inputEl) {
         state.ai.lastQuestion = question;
         appendChatBubble("user", question);
         inputEl.value = "";
-        if (typeof autoResizeTextarea === 'function') autoResizeTextarea(inputEl);
+        if (typeof autoResizeTextarea === 'function') {
+            autoResizeTextarea(inputEl);
+        }
     }
 
     setChatLoading(true);
     const aiBubble = appendChatBubble("ai", `<i class="fa-solid fa-ellipsis fa-fade"></i> جاري التحليل...`);
 
-    const fullContext = state.ai.pdfTexts.join("\n\n").slice(0, 5000); // تحديد طول النص لمنع الانهيار
+    // تحضير السياق (زيادة الحد إلى 20000 حرف)
+    const fullContext = state.ai.pdfTexts
+        .join("\n\n===== NEW DOCUMENT =====\n\n")
+        .slice(-20000);
 
-    // System Prompt المطور (بالإنجليزي لإجبار الدقة)
-    const systemPrompt = `You are a Nursing Academic Expert.
-    STRICT RULES:
-    1. Language: Follow the lecture language.
-    2. Format: You MUST use this interleaved bilingual style for explanations and questions:
-       - [English Text]
-       ..... [Arabic Translation]
-    3. Formatting: 
-       - Medical terms must be: <span style="color: #0ea5e9;">**Term**</span>
-       - Titles must start with ###.
-    4. Context:
-    ${fullContext}`;
+    // System Prompt المحسّن
+    const systemPrompt = `You are a Clinical Nursing Expert specialized in medical education.
 
+CRITICAL FORMATTING RULES - FOLLOW EXACTLY:
+
+1. **Bilingual Format (MANDATORY)**:
+   Every explanation MUST follow this exact structure:
+
+   [Complete sentence in English]
+   ..... [الترجمة الكاملة بالعربية]
+
+2. **Medical Terms Styling**:
+   - Highlight ALL medical terms using: <span style="color:#0ea5e9; font-weight:bold;">Term</span>
+   - Example:
+     <span style="color:#0ea5e9; font-weight:bold;">Glomerular Filtration</span>
+     ..... <span style="color:#0ea5e9; font-weight:bold;">الترشيح الكبيبي</span>
+
+3. **Structure Guidelines**:
+   - Use ### for main titles
+   - Use **bold** for subtitles
+   - Use - for bullet points
+   - Keep paragraphs short (2-3 sentences maximum)
+   - Add line breaks between sections
+
+4. **Response Language**:
+   - ALWAYS respond in the SAME language as the lecture content
+   - If content is bilingual (Arabic + English), maintain BOTH languages
+   - Follow the [English] ..... [العربية] pattern STRICTLY
+
+5. **Content Quality**:
+   - Be concise and academically precise
+   - Focus on key clinical information
+   - Avoid unnecessary repetition
+   - Use simple, clear medical terminology
+
+6. **Examples of Correct Format**:
+
+   ### Urine Formation
+   ### تكوين البول
+
+   - Urine is formed through three main steps.
+   ..... يتكون البول من خلال ثلاث خطوات رئيسية.
+
+   - The first step is <span style="color:#0ea5e9; font-weight:bold;">Glomerular Filtration</span>.
+   ..... الخطوة الأولى هي <span style="color:#0ea5e9; font-weight:bold;">الترشيح الكبيبي</span>.
+
+LECTURE CONTENT:
+${fullContext}
+
+REMEMBER: EVERY SINGLE LINE must follow [English] ..... [العربية] format!
+NO EXCEPTIONS!`;
+
+    // بناء رسائل المحادثة (آخر 6 رسائل = 3 أزواج)
     const messages = [
         { role: "system", content: systemPrompt },
-        ...state.ai.history.slice(-2), // نرسل آخر 6 رسائل فقط لتجنب أخطاء الـ API
+        ...state.ai.history.slice(-6),
         { role: "user", content: question }
     ];
 
@@ -1467,18 +1705,25 @@ async function sendMessageToAI(customPrompt = null) {
             body: JSON.stringify({
                 model: GROQ_MODEL,
                 messages: messages,
-                temperature: 0.6,
-                max_tokens: 2000
+                temperature: 0.5, // تقليل العشوائية لضمان الالتزام بالتنسيق
+                max_tokens: 3000,
+                top_p: 0.9
             })
         });
 
-        if (!response.ok) throw new Error(`API Error: ${response.status}`);
+        if (!response.ok) {
+            const errorData = await response.json().catch(() => ({}));
+            throw new Error(`API Error ${response.status}: ${errorData.error?.message || 'Unknown error'}`);
+        }
 
         const data = await response.json();
         const answer = data.choices[0].message.content;
 
+        // تنظيف وتنسيق الإجابة
+        const cleanedAnswer = cleanAIResponse(answer);
+
         aiBubble.innerHTML = `
-            <div class="bubble-content">${marked.parse(answer)}</div>
+            <div class="bubble-content">${marked.parse(cleanedAnswer)}</div>
             <div class="chat-actions">
                 <button class="copy-msg-btn-mini" onclick="copyToClipboard(this)">
                     <i class="fa-solid fa-copy"></i> نسخ
@@ -1486,19 +1731,82 @@ async function sendMessageToAI(customPrompt = null) {
             </div>
         `;
 
+        // حفظ في السجل
         state.ai.history.push({ role: 'user', content: question });
-        state.ai.history.push({ role: 'assistant', content: answer });
+        state.ai.history.push({ role: 'assistant', content: cleanedAnswer });
+
+        // الحد من طول السجل (حفظ آخر 20 رسالة فقط)
+        if (state.ai.history.length > 20) {
+            state.ai.history = state.ai.history.slice(-20);
+        }
 
     } catch (err) {
-        if (err.name === 'AbortError') return;
+        if (err.name === 'AbortError') {
+            console.log('Request aborted by user');
+            return;
+        }
+
         console.error("Chat Error:", err);
-        aiBubble.innerHTML = `<i class="fa-solid fa-triangle-exclamation"></i> عذراً، حدث خطأ في الاتصال بالانترنت. حاول تقليل حجم الطلب أو تحديث الصفحة.`;
+
+        let errorMessage = 'عذراً، حدث خطأ في الاتصال.';
+
+        if (err.message.includes('401')) {
+            errorMessage = '❌ خطأ في مفتاح API. تحقق من صحة المفتاح.';
+        } else if (err.message.includes('429')) {
+            errorMessage = '⏳ تم تجاوز الحد المسموح. انتظر قليلاً ثم حاول مرة أخرى.';
+        } else if (err.message.includes('500')) {
+            errorMessage = '🔧 خطأ في الخادم. حاول مرة أخرى بعد قليل.';
+        }
+
+        aiBubble.innerHTML = `
+            <i class="fa-solid fa-triangle-exclamation"></i> ${errorMessage}
+            <br><small style="color:#666; margin-top:8px; display:block;">
+                ${err.message}
+            </small>
+        `;
+
     } finally {
         setChatLoading(false);
         state.ai.controller = null;
     }
 }
 
+// ============================
+// 5. TEXT CLEANING & FORMATTING
+// ============================
+
+function cleanAIResponse(text) {
+    if (!text) return '';
+
+    return text
+        // إزالة الأحرف الغريبة (الاحتفاظ بالعربية والإنجليزية فقط)
+        .replace(/[^\u0000-\u007F\u0600-\u06FF\s\d.,;:()\-\*\#\[\]\/\_\n]/g, '')
+
+        // إصلاح تنسيق النقاط الخمس
+        .replace(/\s*\.{5,}\s*/g, ' ..... ')
+        .replace(/\s*\.{3,4}\s*/g, ' ... ')
+
+        // توحيد علامات الترقيم
+        .replace(/\s+([.,!?;:])/g, '$1')
+        .replace(/([.,!?;:])\s*/g, '$1 ')
+
+        // إصلاح المسافات المتعددة
+        .replace(/[ \t]+/g, ' ')
+
+        // إصلاح السطور الفارغة الزائدة
+        .replace(/\n{4,}/g, '\n\n\n')
+
+        // تنظيف المسافات في بداية ونهاية كل سطر
+        .split('\n')
+        .map(line => line.trim())
+        .join('\n')
+
+        .trim();
+}
+
+// ============================
+// 6. CHAT BUBBLE MANAGEMENT
+// ============================
 
 function appendChatBubble(role, content) {
     const chatWin = document.getElementById("chat-window");
@@ -1521,65 +1829,221 @@ function appendChatBubble(role, content) {
         copyBtn.innerHTML = `<i class="fa-solid fa-copy"></i> نسخ`;
         copyBtn.onclick = (e) => {
             e.stopPropagation();
-            navigator.clipboard.writeText(bubbleContent.innerText).then(() => {
-                showToast("تم النسخ بنجاح", "success");
-            });
+            copyToClipboard(copyBtn);
         };
+
         actionsDiv.appendChild(copyBtn);
         div.appendChild(actionsDiv);
+
     } else {
         div.innerText = content;
     }
 
     chatWin.appendChild(div);
+
+    // التمرير السلس إلى الأسفل
     setTimeout(() => {
-        chatWin.scrollTo({ top: chatWin.scrollHeight, behavior: "smooth" });
-    }, 50);
+        chatWin.scrollTo({ 
+            top: chatWin.scrollHeight, 
+            behavior: "smooth" 
+        });
+    }, 100);
+
     return div;
 }
 
-function formatAIResponse(text) {
-    return (window.marked ? marked.parse(text) : text);
+function copyToClipboard(btn) {
+    const bubble = btn.closest('.chat-bubble');
+    if (!bubble) return;
+
+    const contentEl = bubble.querySelector('.bubble-content');
+    const text = contentEl ? contentEl.innerText : bubble.innerText;
+
+    navigator.clipboard.writeText(text).then(() => {
+        showToast('تم النسخ بنجاح ✓', 'success');
+
+        // تغيير النص مؤقتاً
+        const originalHTML = btn.innerHTML;
+        btn.innerHTML = '<i class="fa-solid fa-check"></i> تم النسخ';
+        btn.style.background = 'var(--success-color)';
+
+        setTimeout(() => {
+            btn.innerHTML = originalHTML;
+            btn.style.background = '';
+        }, 2000);
+    }).catch(err => {
+        console.error('Copy failed:', err);
+        showToast('فشل النسخ. حاول مرة أخرى.', 'error');
+    });
 }
 
+// ============================
+// 7. CHAT CONTROLS
+// ============================
 
 function newChat() {
+    // إلغاء أي طلب قيد التنفيذ
+    if (state.ai.controller) {
+        state.ai.controller.abort();
+        state.ai.controller = null;
+    }
+
     state.ai.history = [];
+
     const chatWin = document.getElementById('chat-window');
-    chatWin.innerHTML = '';
-    chatWin.classList.add('empty-state');
-    chatWin.style.display = 'none';
+    if (chatWin) {
+        chatWin.innerHTML = '';
+        chatWin.classList.add('empty-state');
+        chatWin.style.display = 'none';
+    }
+
     const welcomeMsg = document.getElementById('ai-welcome-msg');
     if (welcomeMsg) welcomeMsg.style.display = 'flex';
 
+    setChatLoading(false);
     showToast('تم بدء محادثة جديدة بنجاح', 'info');
 }
 
+// ============================
+// 8. AI QUIZ GENERATOR
+// ============================
 
 function startAIQuiz() {
     if (state.ai.pdfTexts.length === 0) {
         return showToast('ارفع محاضراتك أولاً لنتمكن من اختبارك فيها! 🧪', 'info');
     }
 
-    // أمر محدد جداً لإجبار النموذج على التنسيق سطر بسطر
-    const quizPrompt = `Generate 5 MCQs based on the lectures. 
-    IMPORTANT: You must use the following strictly interleaved bilingual format for EVERY question and EVERY option:
+    const quizPrompt = `Generate 5 Multiple Choice Questions (MCQs) based on the uploaded nursing lectures.
 
-    - [The text in English]
-    ..... [الترجمة أو الشرح بالعربي]
+CRITICAL FORMATTING RULES:
 
-    Structure example:
-    Question 1:
-    - What is the normal range for adult heart rate?
-    ..... ما هو النطاق الطبيعي لمعدل ضربات قلب البالغين؟
+You MUST follow this exact bilingual format for EVERY question and option:
 
-    A) - 60-100 bpm
-    ..... 60-100 نبضة في الدقيقة
+---
 
-    (Apply this to all questions and options. Finally, provide the correct answers in a table at the end.)`;
+**Question [Number]:**
+- [Complete English question]
+..... [السؤال الكامل بالعربية]
+
+**Options:**
+
+A) - [English option]
+..... [الخيار بالعربية]
+
+B) - [English option]
+..... [الخيار بالعربية]
+
+C) - [English option]
+..... [الخيار بالعربية]
+
+D) - [English option]
+..... [الخيار بالعربية]
+
+---
+
+EXAMPLE:
+
+**Question 1:**
+- What is the normal pH range of urine?
+..... ما هو النطاق الطبيعي لدرجة الحموضة (pH) في البول؟
+
+**Options:**
+
+A) - 2.0 - 4.0
+..... 2.0 - 4.0
+
+B) - 4.5 - 8.0
+..... 4.5 - 8.0
+
+C) - 9.0 - 11.0
+..... 9.0 - 11.0
+
+D) - 12.0 - 14.0
+..... 12.0 - 14.0
+
+---
+
+**Question 2:**
+- Which process occurs first in urine formation?
+..... أي عملية تحدث أولاً في تكوين البول؟
+
+**Options:**
+
+A) - Tubular secretion
+..... الإفراز الأنبوبي
+
+B) - Glomerular filtration
+..... الترشيح الكبيبي
+
+C) - Tubular reabsorption
+..... إعادة الامتصاص الأنبوبي
+
+D) - Excretion
+..... الإخراج
+
+---
+
+After all 5 questions, provide the answer key in this format:
+
+### Answer Key
+### مفتاح الإجابات
+
+1. B
+2. B
+3. (correct option)
+4. (correct option)
+5. (correct option)
+
+IMPORTANT RULES:
+1. Questions must be clinically relevant
+2. All options must be plausible
+3. Focus on key concepts from the lectures
+4. DO NOT deviate from the bilingual format
+5. Every line must have [English] ..... [العربية]
+
+Generate 5 questions now.`;
 
     sendMessageToAI(quizPrompt);
 }
+
+// ============================
+// 9. EVENT LISTENERS (Optional)
+// ============================
+
+// إضافة استماع لضغط Enter في حقل الإدخال
+document.addEventListener('DOMContentLoaded', () => {
+    const chatInput = document.getElementById('ai-chat-input');
+
+    if (chatInput) {
+        chatInput.addEventListener('keydown', (e) => {
+            // إرسال عند الضغط على Enter (بدون Shift)
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                handleChatAction();
+            }
+        });
+
+        // Auto-resize عند الكتابة
+        chatInput.addEventListener('input', () => {
+            autoResizeTextarea(chatInput);
+        });
+    }
+});
+
+// ============================
+// 10. UTILITY FUNCTIONS
+// ============================
+
+// دالة عرض Toast (إذا لم تكن موجودة بالفعل)
+
+    // يمكنك استبدال هذا بمكتبة Toast المفضلة لديك
+    // مثال: toastr, sweetalert, أو custom implementation
+
+
+// ============================
+// END OF CODE
+// ============================
+
 
 
 function copyToClipboard(btn) {
