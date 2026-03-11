@@ -21,7 +21,7 @@ const state = {
     }
 };
 
-const GROQ_API_KEY = "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"; // User should replace this
+const GROQ_API_KEY = "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"; // User should replace this
 const GROQ_MODEL = "llama-3.1-8b-instant";
 
 // PDF.js Worker
