@@ -1176,29 +1176,224 @@ async function deleteItem(table, id, callback) {
 async function fetchUsers() {
     const list = document.getElementById('admin-users-list');
     if (!list) return;
+
     list.innerHTML = '<div class="text-center p-3"><i class="fa-solid fa-spinner fa-spin"></i> جاري جلب البيانات...</div>';
 
-    const { data, error } = await sb.from('profiles').select('*').order('full_name', { ascending: true });
-    if (error) return showToast('خطأ في جلب المستخدمين', 'error');
+    try {
+        // 1️⃣ جلب جميع الطلاب من جدول students (للحصول على الإيميل)
+        const { data: students, error: studentsError } = await sb
+            .from('students')
+            .select('id, email');
 
-    list.innerHTML = '';
-    data.forEach(u => {
-        list.innerHTML += `
-            <div class="glass-card" style="padding: 1rem; border-radius: 12px; display:flex; align-items:center; gap:1rem; position:relative;">
-                <img src="${u.avatar || ''}" style="width:50px; height:50px; border-radius:50%; background:var(--glass-bg);">
-                <div style="flex:1;">
-                    <h4 style="font-size:0.95rem; margin-bottom:0.2rem;">${u.full_name}</h4>
-                    <p style="font-size:0.75rem; color:var(--text-muted);">
-                        المرحلة: ${u.stage || 'غير محدد'} | الشعبة: ${u.study_group || 'غير محدد'} | الجنس: ${u.gender === 'male' ? 'ذكر' : 'أنثى'}
-                    </p>
-                    ${u.telegram ? `<a href="https://t.me/${u.telegram.replace('@', '')}" target="_blank" style="font-size:0.75rem; color:var(--primary); text-decoration:none;"><i class="fa-brands fa-telegram"></i> ${u.telegram}</a>` : ''}
+        if (studentsError) {
+            console.error('❌ خطأ في جلب جدول students:', studentsError);
+        }
+
+        // 2️⃣ جلب جميع البروفايلات من جدول profiles (للمعلومات الشخصية)
+        const { data: profiles, error: profilesError } = await sb
+            .from('profiles')
+            .select('id, full_name, avatar, gender, stage, study_group, telegram');
+
+        if (profilesError) {
+            console.error('❌ خطأ في جلب جدول profiles:', profilesError);
+        }
+
+        // 3️⃣ إنشاء Map من جميع الـ IDs الموجودة
+        const allUserIds = new Set([
+            ...(students || []).map(s => s.id),
+            ...(profiles || []).map(p => p.id)
+        ]);
+
+        // 4️⃣ دمج البيانات من المصدرين
+        const users = Array.from(allUserIds).map(userId => {
+            // البحث عن البيانات في كلا الجدولين
+            const studentData = (students || []).find(s => s.id === userId);
+            const profileData = (profiles || []).find(p => p.id === userId);
+
+            // دمج البيانات مع معالجة القيم الفارغة
+            return {
+                id: userId,
+                email: studentData?.email || 'لا يوجد إيميل',
+                full_name: profileData?.full_name || 'لم يكمل الاسم',
+                avatar: profileData?.avatar || `https://api.dicebear.com/7.x/notionists/svg?seed=${userId}&backgroundColor=e3f2fd`,
+                gender: profileData?.gender || null,
+                stage: profileData?.stage || 'غير محدد',
+                study_group: profileData?.study_group || 'غير محدد',
+                telegram: profileData?.telegram || null,
+                // حالة اكتمال البيانات
+                hasEmail: !!studentData?.email,
+                hasProfile: !!profileData?.full_name
+            };
+        });
+
+        // 5️⃣ ترتيب المستخدمين (المكتملين أولاً)
+        users.sort((a, b) => {
+            // الأولوية للحسابات المكتملة
+            const aComplete = a.hasEmail && a.hasProfile;
+            const bComplete = b.hasEmail && b.hasProfile;
+
+            if (aComplete && !bComplete) return -1;
+            if (!aComplete && bComplete) return 1;
+
+            // ترتيب أبجدي للأسماء
+            if (a.full_name === 'لم يكمل الاسم' && b.full_name !== 'لم يكمل الاسم') return 1;
+            if (a.full_name !== 'لم يكمل الاسم' && b.full_name === 'لم يكمل الاسم') return -1;
+
+            return a.full_name.localeCompare(b.full_name, 'ar');
+        });
+
+        // 6️⃣ عرض النتائج
+        list.innerHTML = '';
+
+        if (users.length === 0) {
+            list.innerHTML = '<p class="text-muted text-center" style="padding:2rem">لا يوجد مستخدمين مسجلين</p>';
+            return;
+        }
+
+        // 7️⃣ إنشاء البطاقات
+        users.forEach(user => {
+            const genderText = user.gender === 'male' ? 'ذكر' 
+                             : user.gender === 'female' ? 'أنثى' 
+                             : 'غير محدد';
+
+            // تحديد حالة اكتمال البيانات
+            const isIncomplete = !user.hasEmail || !user.hasProfile;
+            const warningColor = 'rgba(245, 158, 11, 0.3)';
+            const warningBg = 'rgba(245, 158, 11, 0.05)';
+
+            list.innerHTML += `
+                <div class="glass-card" style="
+                    padding: 1rem; 
+                    border-radius: 12px; 
+                    display: flex; 
+                    align-items: center; 
+                    gap: 1rem; 
+                    position: relative;
+                    ${isIncomplete ? `border: 1px solid ${warningColor}; background: ${warningBg};` : ''}
+                ">
+                    <!-- صورة المستخدم -->
+                    <img src="${user.avatar}" 
+                         style="width: 50px; height: 50px; border-radius: 50%; background: var(--glass-bg); border: 2px solid ${isIncomplete ? 'var(--warning)' : 'transparent'};">
+
+                    <!-- معلومات المستخدم -->
+                    <div style="flex: 1;">
+                        <!-- الاسم مع أيقونة التحذير -->
+                        <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.2rem;">
+                            <h4 style="font-size: 0.95rem; margin: 0; ${isIncomplete ? 'color: var(--warning)' : ''}">
+                                ${user.full_name}
+                            </h4>
+                            ${isIncomplete ? `
+                                <i class="fa-solid fa-exclamation-triangle" 
+                                   style="color: var(--warning); font-size: 0.75rem;" 
+                                   title="بيانات ناقصة: ${!user.hasEmail ? 'لا يوجد إيميل' : ''} ${!user.hasProfile ? 'لا يوجد بروفايل' : ''}">
+                                </i>
+                            ` : ''}
+                        </div>
+
+                        <!-- البريد الإلكتروني -->
+                        <p style="font-size: 0.7rem; color: ${user.hasEmail ? 'var(--primary)' : 'var(--danger)'}; margin: 0 0 0.3rem 0; font-family: 'Outfit', sans-serif;">
+                            <i class="fa-solid fa-envelope" style="font-size: 0.65rem;"></i> 
+                            ${user.email}
+                        </p>
+
+                        <!-- البيانات الدراسية -->
+                        <p style="font-size: 0.75rem; color: var(--text-muted); margin: 0;">
+                            المرحلة: <span style="${user.stage === 'غير محدد' ? 'color: var(--warning)' : ''}">${user.stage}</span> | 
+                            الشعبة: <span style="${user.study_group === 'غير محدد' ? 'color: var(--warning)' : ''}">${user.study_group}</span> | 
+                            الجنس: <span style="${genderText === 'غير محدد' ? 'color: var(--warning)' : ''}">${genderText}</span>
+                        </p>
+
+                        <!-- حساب التليجرام -->
+                        ${user.telegram 
+                            ? `<a href="https://t.me/${user.telegram.replace('@', '')}" 
+                                  target="_blank" 
+                                  style="font-size: 0.75rem; color: var(--primary); text-decoration: none; margin-top: 0.3rem; display: inline-block;">
+                                  <i class="fa-brands fa-telegram"></i> ${user.telegram}
+                               </a>` 
+                            : `<span style="font-size: 0.7rem; color: var(--text-muted); margin-top: 0.3rem; display: inline-block;">
+                                  <i class="fa-brands fa-telegram"></i> لا يوجد
+                               </span>`
+                        }
+                    </div>
+
+                    <!-- زر الحذف -->
+                    <button class="action-btn text-danger" 
+                            style="position: absolute; left: 1rem; top: 1rem;" 
+                            onclick="deleteUser('${user.id}')" 
+                            title="حذف المستخدم">
+                        <i class="fa-solid fa-user-minus"></i>
+                    </button>
                 </div>
-                <button class="action-btn text-danger" style="position:absolute; left:1rem; top:1rem;" onclick="deleteItem('profiles', '${u.id}', fetchUsers)">
-                    <i class="fa-solid fa-user-minus"></i>
+            `;
+        });
+
+        // 8️⃣ عرض إحصائيات
+        const completeCount = users.filter(u => u.hasEmail && u.hasProfile).length;
+        const incompleteCount = users.length - completeCount;
+
+        if (incompleteCount > 0) {
+            list.insertAdjacentHTML('afterbegin', `
+                <div class="glass-card" style="
+                    padding: 0.8rem; 
+                    margin-bottom: 1rem; 
+                    background: rgba(245, 158, 11, 0.1); 
+                    border: 1px solid rgba(245, 158, 11, 0.3);
+                    text-align: center;
+                ">
+                    <i class="fa-solid fa-chart-pie" style="color: var(--warning); margin-left: 0.5rem;"></i>
+                    <strong>الإحصائيات:</strong>
+                    ${completeCount} حساب مكتمل | 
+                    <span style="color: var(--warning);">${incompleteCount} حساب ناقص</span>
+                </div>
+            `);
+        }
+
+    } catch (error) {
+        console.error('❌ خطأ عام في جلب المستخدمين:', error);
+        list.innerHTML = `
+            <div class="glass-card text-center" style="padding: 2rem; color: var(--danger);">
+                <i class="fa-solid fa-triangle-exclamation" style="font-size: 2rem; margin-bottom: 1rem;"></i>
+                <p>حدث خطأ في تحميل المستخدمين</p>
+                <small style="color: var(--text-muted); display: block; margin-top: 0.5rem;">
+                    ${error.message}
+                </small>
+                <button class="btn primary-btn" style="margin-top: 1rem; width: auto; padding: 0.5rem 1.5rem;" onclick="fetchUsers()">
+                    <i class="fa-solid fa-rotate-right"></i> إعادة المحاولة
                 </button>
             </div>
         `;
-    });
+        showToast('فشل تحميل المستخدمين', 'error');
+    }
+}
+
+// ============================
+// دالة حذف مستخدم من كلا الجدولين
+// ============================
+async function deleteUser(userId) {
+    if (!confirm('هل أنت متأكد من حذف هذا المستخدم نهائياً؟\n\n⚠️ سيتم حذف جميع بياناته من النظام!')) {
+        return;
+    }
+
+    try {
+        // حذف من جدول profiles
+        const { error: profileError } = await sb.from('profiles').delete().eq('id', userId);
+        if (profileError && profileError.code !== 'PGRST116') { // PGRST116 = row not found
+            console.error('خطأ في حذف profile:', profileError);
+        }
+
+        // حذف من جدول students
+        const { error: studentError } = await sb.from('students').delete().eq('id', userId);
+        if (studentError && studentError.code !== 'PGRST116') {
+            console.error('خطأ في حذف student:', studentError);
+        }
+
+        showToast('تم حذف المستخدم بنجاح', 'success');
+        fetchUsers(); // إعادة تحميل القائمة
+
+    } catch (error) {
+        console.error('خطأ في حذف المستخدم:', error);
+        showToast('فشل حذف المستخدم: ' + error.message, 'error');
+    }
 }
 
 // ============================
